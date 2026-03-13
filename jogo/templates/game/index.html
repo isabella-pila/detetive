@@ -1,0 +1,112 @@
+{% extends "game/base.html" %}
+{% block title %}Murdle — Início{% endblock %}
+
+{% block extra_css %}
+<style>
+  .start-wrap { text-align: center; padding: 3.5rem 0 2rem; }
+
+  .icon { font-size: 52px; display: block; margin-bottom: 1.5rem; }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
+    font-weight: 700; letter-spacing: -1px;
+    color: var(--parch);
+    margin-bottom: .5rem;
+  }
+  .tagline {
+    font-family: 'Playfair Display', serif;
+    font-style: italic; font-size: 16px;
+    color: var(--parch-dim); margin-bottom: 2.5rem;
+  }
+
+  .rules {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    gap: 12px; margin-bottom: 2rem; text-align: left;
+  }
+  .rule-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 28px; color: var(--gold); font-weight: 500; margin-bottom: 6px;
+  }
+  .rule p { font-size: 13px; color: var(--fog); line-height: 1.7; }
+
+  .divider {
+    border: none; border-top: 1px solid rgba(200,150,12,.2);
+    margin: 2rem 0;
+  }
+
+  .form-row { display: flex; gap: 8px; align-items: center; }
+  .form-row input { flex: 1; }
+
+  .notice {
+    font-size: 12px; color: var(--fog);
+    margin-top: .6rem; text-align: left;
+  }
+  .notice span { color: var(--blood-lt); }
+
+  @media(max-width:520px){ .rules{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="start-wrap">
+
+  <span class="icon">🔍</span>
+  <p class="eyebrow" style="margin-bottom:.6rem;">Um jogo de lógica e dedução</p>
+  <h1>Murdle</h1>
+  <p class="tagline">Mistério na Mansão</p>
+
+  <div class="rules">
+    <div class="card rule">
+      <div class="rule-num">01</div>
+      <p>Interrogue os <strong>3 suspeitos</strong> e analise suas respostas em busca de contradições.</p>
+    </div>
+    <div class="card rule">
+      <div class="rule-num">02</div>
+      <p>Determine o <strong>culpado</strong>, a <strong>arma</strong> e o <strong>local</strong> do crime.</p>
+    </div>
+    <div class="card rule">
+      <div class="rule-num">03</div>
+      <p>Faça sua acusação em até <strong>5 tentativas</strong>. Dicas são fornecidas a cada erro.</p>
+    </div>
+  </div>
+
+  {% if erro %}
+  <div class="alert alert-error" style="text-align:left;">
+    ⚠ Erro ao gerar mistério: {{ erro }}
+  </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'novo_jogo' %}">
+    {% csrf_token %}
+    <div class="card" style="text-align:left; margin-bottom:.5rem;">
+      <p class="eyebrow" style="margin-bottom:.8rem;">🔑 Chave OpenAI API</p>
+      <div class="form-row">
+        <input type="password" name="api_key" id="api_key"
+               placeholder="sk-..." autocomplete="off" required />
+        <button type="submit" class="btn btn-lg" id="start-btn">
+          Iniciar investigação →
+        </button>
+      </div>
+    </div>
+  </form>
+  <p class="notice">
+    <span>Nota:</span> Sua chave é usada apenas nesta sessão e não é armazenada.
+    Você precisará de uma chave válida da <a href="https://platform.openai.com" style="color:var(--gold);">OpenAI</a>.
+  </p>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelector('form').addEventListener('submit', function(e) {
+    const btn = document.getElementById('start-btn');
+    btn.disabled = true;
+    btn.innerHTML = 'Gerando mistério <span class="dots"><span></span><span></span><span></span></span>';
+    // Salva a chave em sessionstorage para passar via hidden field depois
+    const key = document.getElementById('api_key').value;
+    sessionStorage.setItem('oai_key', key);
+  });
+</script>
+{% endblock %}

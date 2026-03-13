@@ -1,0 +1,506 @@
+{% extends "game/base.html" %}
+{% block title %}Murdle — Investigação{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Header ── */
+  .game-header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 1.5rem 0 1rem;
+    border-bottom: 1px solid rgba(200,150,12,.25);
+    margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap;
+  }
+  .game-header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem; font-weight: 700; color: var(--parch);
+  }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  /* ── Attempt dots ── */
+  .dots-bar { display: flex; gap: 5px; align-items: center; }
+  .dot {
+    width: 11px; height: 11px; border-radius: 50%;
+    border: 1px solid rgba(200,150,12,.4);
+  }
+  .dot.used     { background: var(--blood); border-color: var(--blood); }
+  .dot.remaining{ background: rgba(200,150,12,.5); }
+  .attempts-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 1px; color: var(--fog);
+    margin-right: 4px;
+  }
+
+  /* ── Story ── */
+  .story-body {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px; line-height: 2;
+    color: var(--parch-dim);
+  }
+  .story-body p { margin-bottom: .9rem; }
+  .story-body p:last-child { margin-bottom: 0; }
+
+  /* ── Evidence chips ── */
+  .evidence-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(200,150,12,.12); }
+  .ev-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 120px; }
+  .ev-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--fog); font-family: 'DM Mono', monospace; }
+  .ev-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .chip {
+    padding: 3px 9px; border-radius: 20px; font-size: 11px;
+    border: 1px solid rgba(200,150,12,.2); color: var(--parch-dim);
+    font-family: 'DM Mono', monospace; text-transform: capitalize;
+  }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 3px; margin-bottom: -1px; }
+  .tab {
+    padding: 9px 18px;
+    background: transparent;
+    border: 1px solid rgba(200,150,12,.18); border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    color: var(--fog); font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; transition: all .18s;
+  }
+  .tab:hover { color: var(--parch); }
+  .tab.active { background: rgba(200,150,12,.1); border-color: rgba(200,150,12,.35); color: var(--gold); }
+  .tab-panels { border: 1px solid rgba(200,150,12,.2); border-radius: 0 4px 4px 4px; }
+  .panel { display: none; padding: 1.4rem 1.6rem; }
+  .panel.active { display: block; }
+
+  /* ── Suspect selector ── */
+  .suspect-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 1rem; }
+  .sus-btn {
+    padding: 10px 8px; text-align: center;
+    background: transparent;
+    border: 1px solid rgba(200,150,12,.2); border-radius: var(--radius);
+    color: var(--fog); font-family: 'DM Sans', sans-serif; font-size: 13px;
+    cursor: pointer; transition: all .18s;
+  }
+  .sus-btn:hover, .sus-btn.selected {
+    background: rgba(139,26,26,.2);
+    border-color: var(--blood-lt); color: var(--parch);
+  }
+  .sus-btn .sus-icon { display: block; font-size: 22px; margin-bottom: 4px; }
+
+  /* ── Question area ── */
+  .q-row { display: flex; gap: 8px; align-items: flex-end; }
+  .q-row textarea { flex: 1; height: 72px; }
+
+  /* ── Chat log ── */
+  .log { display: flex; flex-direction: column; gap: 14px; max-height: 380px; overflow-y: auto; padding-right: 4px; }
+  .log-entry {}
+  .log-who { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--fog); font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+  .log-bubble {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px; line-height: 1.75;
+    color: var(--parch-dim); padding: 10px 14px;
+    border-left: 2px solid; border-radius: 0 4px 4px 0;
+    background: rgba(255,255,255,.03);
+  }
+  .log-bubble.player   { border-color: rgba(155,155,155,.4); }
+  .log-bubble.suspect  { border-color: var(--blood-lt); }
+  .log-bubble.hint     { border-color: var(--gold); }
+  .log-bubble.system   { border-color: var(--fog); font-style: italic; font-size: 13px; }
+  .log-sep { border: none; border-top: 1px solid rgba(200,150,12,.1); margin: 2px 0; }
+
+  /* ── Accusation form ── */
+  .acc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 1rem; }
+  .acc-group label {
+    display: block; font-size: 10px; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--fog);
+    font-family: 'DM Mono', monospace; margin-bottom: 5px;
+  }
+  #acc-result { margin-top: 1rem; }
+
+  /* ── Result overlay ── */
+  .result-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(10,7,3,.92);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+  }
+  .result-box {
+    max-width: 500px; width: 100%; text-align: center;
+    background: #1f170b;
+    border: 1px solid rgba(200,150,12,.35);
+    border-radius: 6px; padding: 2.5rem 2rem;
+  }
+  .result-icon { font-size: 56px; display: block; margin-bottom: 1rem; }
+  .result-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem; margin-bottom: .4rem;
+  }
+  .result-title.win  { color: var(--gold); }
+  .result-title.lose { color: var(--blood-lt); }
+  .result-detail { font-size: 12px; color: var(--fog); font-family: 'DM Mono', monospace; margin-bottom: 1.5rem; letter-spacing: 1px; }
+  .sol-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 1.2rem 0; }
+  .sol-item { border: 1px solid rgba(200,150,12,.25); border-radius: var(--radius); padding: 10px; text-align: left; }
+  .sol-item .s-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--fog); margin-bottom: 4px; font-family: 'DM Mono', monospace; }
+  .sol-item .s-val { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--gold); text-transform: capitalize; }
+
+  /* ── Game over state (inline banner) ── */
+  .over-banner {
+    background: rgba(139,26,26,.15);
+    border: 1px solid rgba(192,57,43,.3);
+    border-radius: var(--radius); padding: 14px 18px;
+    margin-bottom: 1.5rem; font-size: 14px;
+  }
+
+  @media(max-width:520px){
+    .acc-grid, .sol-grid { grid-template-columns: 1fr; }
+    .suspect-grid { grid-template-columns: repeat(3,1fr); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if game_over %}
+<!-- ── Result overlay ── -->
+<div class="result-overlay" id="result-overlay">
+  <div class="result-box">
+    <span class="result-icon">{% if vitoria %}🎉{% else %}💀{% endif %}</span>
+    <div class="result-title {% if vitoria %}win{% else %}lose{% endif %}">
+      {% if vitoria %}Mistério Resolvido!{% else %}O culpado fugiu.{% endif %}
+    </div>
+    <div class="result-detail">
+      {% if vitoria %}
+        Caso encerrado em {{ tentativas }} tentativa{{ tentativas|pluralize:"s" }} e {{ historico|length }} interrogatório{{ historico|length|pluralize:"s" }}.
+      {% else %}
+        Após {{ max_tentativas }} tentativas, o caso permanece em aberto.
+      {% endif %}
+    </div>
+    {% if solucao %}
+    <div class="sol-grid">
+      <div class="sol-item"><div class="s-label">Culpado</div><div class="s-val">{{ solucao.pessoa }}</div></div>
+      <div class="sol-item"><div class="s-label">Arma</div><div class="s-val">{{ solucao.arma }}</div></div>
+      <div class="sol-item"><div class="s-label">Local</div><div class="s-val">{{ solucao.local }}</div></div>
+    </div>
+    {% endif %}
+    <form method="post" action="{% url 'reiniciar' %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-lg">Novo mistério →</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Header ── -->
+<div class="game-header">
+  <div>
+    <p class="eyebrow" style="margin-bottom:.3rem;">🕯 Investigação em curso</p>
+    <h1>Murdle</h1>
+  </div>
+  <div class="header-right">
+    <span class="attempts-label">Tentativas</span>
+    <div class="dots-bar">
+      {% for d in dots %}
+      <div class="dot {{ d }}"></div>
+      {% endfor %}
+    </div>
+    <form method="post" action="{% url 'reiniciar' %}" style="margin-left:8px;">
+      {% csrf_token %}
+      <button type="submit" class="btn" title="Reiniciar">↺ Reiniciar</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Story card ── -->
+<div class="card" style="margin-bottom:1.5rem;">
+  <p class="eyebrow" style="margin-bottom:.9rem;">📜 Relatório do crime</p>
+  <div class="story-body">
+    {% for para in historia_paragrafos %}
+    <p>{{ para }}</p>
+    {% endfor %}
+  </div>
+  <div class="evidence-row">
+    <div class="ev-group">
+      <span class="ev-label">Suspeitos</span>
+      <div class="ev-chips">
+        {% for p in personagens %}<span class="chip">{{ p }}</span>{% endfor %}
+      </div>
+    </div>
+    <div class="ev-group">
+      <span class="ev-label">Armas</span>
+      <div class="ev-chips">
+        {% for a in armas %}<span class="chip">{{ a }}</span>{% endfor %}
+      </div>
+    </div>
+    <div class="ev-group">
+      <span class="ev-label">Locais</span>
+      <div class="ev-chips">
+        {% for l in locais %}<span class="chip">{{ l }}</span>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tabs ── -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('interrogar')">🗣 Interrogar</button>
+  <button class="tab" onclick="switchTab('acusar')">⚖️ Acusar</button>
+  <button class="tab" onclick="switchTab('historico')">📋 Histórico</button>
+</div>
+
+<div class="tab-panels">
+
+  <!-- ── INTERROGATION panel ── -->
+  <div class="panel active" id="panel-interrogar">
+    <p class="eyebrow" style="margin-bottom:.9rem;">Escolha um suspeito</p>
+    <div class="suspect-grid">
+      <button class="sus-btn" onclick="selectSuspect('mordomo', this)">
+        <span class="sus-icon">🤵</span>Mordomo
+      </button>
+      <button class="sus-btn" onclick="selectSuspect('herdeira', this)">
+        <span class="sus-icon">👩</span>Herdeira
+      </button>
+      <button class="sus-btn" onclick="selectSuspect('jardineiro', this)">
+        <span class="sus-icon">👨‍🌾</span>Jardineiro
+      </button>
+    </div>
+    <div class="q-row">
+      <textarea id="q-input" disabled
+        placeholder="Onde você estava quando o crime ocorreu?&#10;Você viu alguém naquela noite?&#10;O que você sabe sobre a arma?"></textarea>
+      <button class="btn" id="ask-btn" onclick="askSuspect()" disabled>Perguntar →</button>
+    </div>
+    <div id="inq-result" style="margin-top:1rem;"></div>
+  </div>
+
+  <!-- ── ACCUSATION panel ── -->
+  <div class="panel" id="panel-acusar">
+    {% if not game_over %}
+    <p class="eyebrow" style="margin-bottom:.9rem;">Faça sua acusação formal</p>
+    <div class="acc-grid">
+      <div class="acc-group">
+        <label>Culpado</label>
+        <select id="acc-pessoa">
+          <option value="">Selecione...</option>
+          {% for p in personagens %}<option value="{{ p }}">{{ p|capfirst }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="acc-group">
+        <label>Arma</label>
+        <select id="acc-arma">
+          <option value="">Selecione...</option>
+          {% for a in armas %}<option value="{{ a }}">{{ a|capfirst }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="acc-group">
+        <label>Local</label>
+        <select id="acc-local">
+          <option value="">Selecione...</option>
+          {% for l in locais %}<option value="{{ l }}">{{ l|capfirst }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-blood" id="acc-btn" onclick="makeAccusation()">Acusar formalmente →</button>
+    <div id="acc-result"></div>
+    {% else %}
+    <p style="color:var(--fog); font-size:14px; font-style:italic;">O jogo encerrou. Inicie uma nova investigação.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── HISTORY panel ── -->
+  <div class="panel" id="panel-historico">
+    <p class="eyebrow" style="margin-bottom:.9rem;">Histórico de interrogatórios</p>
+    <div class="log" id="hist-log">
+      {% if historico %}
+        {% for e in historico %}
+        <div class="log-entry">
+          <div class="log-who">🕵️ Detetive → {{ e.personagem|upper }}</div>
+          <div class="log-bubble player">{{ e.pergunta }}</div>
+          <div class="log-who" style="margin-top:6px;">{{ e.personagem|upper }} responde</div>
+          <div class="log-bubble suspect">{{ e.resposta }}</div>
+        </div>
+        {% if not forloop.last %}<hr class="log-sep">{% endif %}
+        {% endfor %}
+      {% else %}
+        <div class="log-bubble system">Nenhum interrogatório realizado ainda.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div><!-- tab-panels -->
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+let selectedSuspect = null;
+
+// ── Tab switching ────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const tabs = ['interrogar', 'acusar', 'historico'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ── Suspect selection ────────────────────────────────────────────
+function selectSuspect(name, el) {
+  selectedSuspect = name;
+  document.querySelectorAll('.sus-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('q-input').disabled = false;
+  document.getElementById('ask-btn').disabled = false;
+}
+
+// ── Send question (Agente 2) ─────────────────────────────────────
+async function askSuspect() {
+  const pergunta = document.getElementById('q-input').value.trim();
+  if (!selectedSuspect || !pergunta) return;
+
+  const btn = document.getElementById('ask-btn');
+  btn.disabled = true;
+  btn.innerHTML = 'Aguardando <span class="dots"><span></span><span></span><span></span></span>';
+
+  const res = await fetch('{% url "interrogar" %}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ personagem: selectedSuspect, pergunta }),
+  });
+
+  const data = await res.json();
+  btn.disabled = false; btn.textContent = 'Perguntar →';
+
+  const area = document.getElementById('inq-result');
+  if (data.erro) {
+    area.innerHTML = `<div class="log-bubble system">Erro: ${data.erro}</div>`;
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="log-who">${data.personagem.toUpperCase()} responde</div>
+    <div class="log-bubble suspect">${data.resposta}</div>
+  `;
+  document.getElementById('q-input').value = '';
+
+  // Add to history panel
+  addToHistory(data.personagem, data.pergunta, data.resposta);
+}
+
+// ── Make accusation (Agente 3) ───────────────────────────────────
+async function makeAccusation() {
+  const pessoa = document.getElementById('acc-pessoa').value;
+  const arma   = document.getElementById('acc-arma').value;
+  const local  = document.getElementById('acc-local').value;
+  if (!pessoa || !arma || !local) {
+    document.getElementById('acc-result').innerHTML =
+      '<div class="log-bubble system">Selecione culpado, arma e local.</div>';
+    return;
+  }
+
+  const btn = document.getElementById('acc-btn');
+  btn.disabled = true;
+  btn.innerHTML = 'Verificando <span class="dots"><span></span><span></span><span></span></span>';
+
+  const res = await fetch('{% url "acusar" %}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ pessoa, arma, local }),
+  });
+
+  const data = await res.json();
+
+  // Update dots
+  updateDots(data.tentativas, data.max_tentativas);
+
+  const area = document.getElementById('acc-result');
+
+  if (data.resultado === 'acertou') {
+    showResult(true, data.tentativas, data.solucao);
+    return;
+  }
+
+  // Wrong — show feedback + hint
+  const acertosStr = data.acertos.length ? data.acertos.join(', ') : 'nenhum';
+  let html = `
+    <div style="margin-top:.8rem;">
+      <div class="log-who" style="color:var(--blood-lt);">❌ Tentativa ${data.tentativas}/${data.max_tentativas}</div>
+      <div class="log-bubble system">
+        Corretos: <strong>${acertosStr}</strong> &nbsp;|&nbsp; Errados: ${data.erros.join(', ')}
+      </div>
+    </div>`;
+
+  if (data.dica) {
+    html += `
+      <div style="margin-top:.8rem;">
+        <div class="log-who">💡 Investigador sênior</div>
+        <div class="log-bubble hint">${data.dica}</div>
+      </div>`;
+  }
+  area.innerHTML = html;
+
+  btn.disabled = false; btn.textContent = 'Acusar formalmente →';
+
+  if (data.solucao) {
+    // Game over - lost
+    setTimeout(() => showResult(false, data.tentativas, data.solucao), 1500);
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────
+function updateDots(used, total) {
+  const bar = document.querySelector('.dots-bar');
+  bar.innerHTML = Array.from({length: total}, (_, i) =>
+    `<div class="dot ${i < used ? 'used' : 'remaining'}"></div>`
+  ).join('');
+}
+
+function addToHistory(personagem, pergunta, resposta) {
+  const log = document.getElementById('hist-log');
+  // Remove empty state message if present
+  const empty = log.querySelector('.system');
+  if (empty && log.children.length === 1) log.innerHTML = '';
+
+  if (log.children.length) {
+    log.insertAdjacentHTML('beforeend', '<hr class="log-sep">');
+  }
+  log.insertAdjacentHTML('beforeend', `
+    <div class="log-entry">
+      <div class="log-who">🕵️ Detetive → ${personagem.toUpperCase()}</div>
+      <div class="log-bubble player">${pergunta}</div>
+      <div class="log-who" style="margin-top:6px;">${personagem.toUpperCase()} responde</div>
+      <div class="log-bubble suspect">${resposta}</div>
+    </div>
+  `);
+  log.scrollTop = log.scrollHeight;
+}
+
+function showResult(win, tentativas, solucao) {
+  // If overlay already exists (server-rendered), just show it
+  const existing = document.getElementById('result-overlay');
+  if (existing) { existing.style.display = 'flex'; return; }
+
+  // Build overlay dynamically for AJAX result
+  const solHtml = solucao ? `
+    <div class="sol-grid">
+      <div class="sol-item"><div class="s-label">Culpado</div><div class="s-val">${solucao.pessoa}</div></div>
+      <div class="sol-item"><div class="s-label">Arma</div><div class="s-val">${solucao.arma}</div></div>
+      <div class="sol-item"><div class="s-label">Local</div><div class="s-val">${solucao.local}</div></div>
+    </div>` : '';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'result-overlay';
+  overlay.innerHTML = `
+    <div class="result-box">
+      <span class="result-icon">${win ? '🎉' : '💀'}</span>
+      <div class="result-title ${win ? 'win' : 'lose'}">${win ? 'Mistério Resolvido!' : 'O culpado fugiu.'}</div>
+      <div class="result-detail">${win ? `Caso encerrado em ${tentativas} tentativa(s).` : 'Sem tentativas restantes.'}</div>
+      ${solHtml}
+      <form method="post" action="{% url 'reiniciar' %}" style="display:inline;">
+        <input type="hidden" name="csrfmiddlewaretoken" value="${CSRF}">
+        <button type="submit" class="btn btn-lg">Novo mistério →</button>
+      </form>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+// Enter sends question (Shift+Enter = newline)
+document.getElementById('q-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askSuspect(); }
+});
+</script>
+{% endblock %}

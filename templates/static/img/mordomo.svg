@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 20" shape-rendering="crispEdges">
+  <!-- cabeca -->
+  <rect x="5" y="1" width="6" height="6" fill="#f5cba7"/>
+  <!-- olhos -->
+  <rect x="6" y="3" width="1" height="1" fill="#1a1209"/>
+  <rect x="9" y="3" width="1" height="1" fill="#1a1209"/>
+  <!-- boca -->
+  <rect x="7" y="5" width="2" height="1" fill="#c0392b"/>
+  <!-- cabelo lateral -->
+  <rect x="4" y="1" width="1" height="3" fill="#2c2c2c"/>
+  <rect x="11" y="1" width="1" height="3" fill="#2c2c2c"/>
+  <!-- cartola -->
+  <rect x="5" y="0" width="6" height="1" fill="#1a1209"/>
+  <rect x="4" y="1" width="8" height="1" fill="#1a1209"/>
+  <!-- faixa cartola -->
+  <rect x="5" y="1" width="6" height="1" fill="#c8960c"/>
+  <!-- corpo - casaca preta -->
+  <rect x="4" y="7" width="8" height="7" fill="#2c2c2c"/>
+  <!-- camisa branca -->
+  <rect x="6" y="7" width="4" height="5" fill="#f0e8d0"/>
+  <!-- gravata borboleta -->
+  <rect x="7" y="8" width="2" height="1" fill="#8b1a1a"/>
+  <!-- botoes -->
+  <rect x="7" y="10" width="1" height="1" fill="#c8960c"/>
+  <rect x="8" y="11" width="1" height="1" fill="#c8960c"/>
+  <!-- bracas -->
+  <rect x="2" y="7" width="2" height="5" fill="#2c2c2c"/>
+  <rect x="12" y="7" width="2" height="5" fill="#2c2c2c"/>
+  <!-- maos -->
+  <rect x="1" y="11" width="2" height="2" fill="#f5cba7"/>
+  <rect x="13" y="11" width="2" height="2" fill="#f5cba7"/>
+  <!-- pernas -->
+  <rect x="5" y="14" width="3" height="4" fill="#1a1209"/>
+  <rect x="8" y="14" width="3" height="4" fill="#1a1209"/>
+  <!-- sapatos -->
+  <rect x="4" y="18" width="4" height="2" fill="#0a0a0a"/>
+  <rect x="8" y="18" width="4" height="2" fill="#0a0a0a"/>
+</svg>
