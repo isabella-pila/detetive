@@ -79,17 +79,15 @@ def jogo(request):
         "historico": state.historico,
         "tentativas": state.tentativas,
         "max_tentativas": state.max_tentativas,
-        "restantes": state.tentativas_restantes,
         "game_over": state.game_over,
         "vitoria": state.vitoria,
         "solucao": state.solucao if state.game_over else None,
-        "personagens": EstadoJogo.PERSONAGENS,
+        "personagens_lista": state.personagens,      # [{"id","nome","papel","genero"}]
+        "personagens_nomes": [p["nome"] for p in state.personagens],  # para os selects
         "armas": EstadoJogo.ARMAS,
         "locais": EstadoJogo.LOCAIS,
-        "dots": [
-            "used" if i < state.tentativas else "remaining"
-            for i in range(state.max_tentativas)
-        ],
+        "dots": ["used" if i < state.tentativas else "remaining"
+                for i in range(state.max_tentativas)],
     }
 
     return render(request, "game/jogo.html", ctx)
@@ -110,36 +108,34 @@ def interrogar(request):
 
     try:
         body = json.loads(request.body)
-        personagem = body.get("personagem", "").strip().lower()
+        pid      = body.get("pid", "").strip()
         pergunta = body.get("pergunta", "").strip()
-
     except Exception:
         return JsonResponse({"erro": "Dados inválidos."}, status=400)
 
-    if personagem not in EstadoJogo.PERSONAGENS:
-        return JsonResponse(
-            {"erro": f"Suspeito inválido: {personagem}"},
-            status=400
-        )
+    if not pid:
+        return JsonResponse({"erro": "Nenhum personagem selecionado."}, status=400)
+
+    if not state.get_personagem(pid):
+        return JsonResponse({"erro": f"Personagem inválido: {pid}"}, status=400)
 
     if not pergunta:
-        return JsonResponse(
-            {"erro": "A pergunta não pode estar vazia."},
-            status=400
-        )
+        return JsonResponse({"erro": "A pergunta não pode estar vazia."}, status=400)
 
     try:
-        resposta = interrogar_suspeito(personagem, pergunta, state)
-
+        resposta   = interrogar_suspeito(pid, pergunta, state)
+        personagem = state.get_personagem(pid)
     except Exception as e:
         return JsonResponse({"erro": str(e)}, status=500)
 
     _save_state(request, state)
 
     return JsonResponse({
-        "personagem": personagem,
+        "pid":      pid,
+        "nome":     personagem["nome"],
+        "genero":   personagem["genero"],
         "pergunta": pergunta,
-        "resposta": resposta
+        "resposta": resposta,
     })
 
 

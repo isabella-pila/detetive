@@ -1,506 +1,922 @@
 {% extends "game/base.html" %}
+{% load static %}
 {% block title %}Murdle — Investigação{% endblock %}
 
 {% block extra_css %}
+
 <style>
-  /* ── Header ── */
-  .game-header {
-    display: flex; justify-content: space-between; align-items: flex-end;
-    padding: 1.5rem 0 1rem;
-    border-bottom: 1px solid rgba(200,150,12,.25);
-    margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap;
-  }
-  .game-header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 2rem; font-weight: 700; color: var(--parch);
-  }
-  .header-right { display: flex; align-items: center; gap: 10px; }
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
-  /* ── Attempt dots ── */
-  .dots-bar { display: flex; gap: 5px; align-items: center; }
-  .dot {
-    width: 11px; height: 11px; border-radius: 50%;
-    border: 1px solid rgba(200,150,12,.4);
-  }
-  .dot.used     { background: var(--blood); border-color: var(--blood); }
-  .dot.remaining{ background: rgba(200,150,12,.5); }
-  .attempts-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px; letter-spacing: 1px; color: var(--fog);
-    margin-right: 4px;
-  }
+:root {
+  --px: 3px;
+  --green:   #1a5c1a;
+  --green2:  #2d8c2d;
+  --grass:   #3cb34a;
+  --sky:     #1a1a2e;
+  --sky2:    #16213e;
+  --gold:    #f0a000;
+  --gold2:   #ffd060;
+  --cream:   #f0e8c8;
+  --blood:   #8b0000;
+  --stone:   #484848;
+  --stone2:  #686868;
+  --window:  #4080c0;
+  --border:  #000;
+  --text:    #f0e8c8;
+  --shadow:  rgba(0,0,0,.7);
+  --ui-bg:   #0a0a18;
+  --ui-border:#f0a000;
+}
 
-  /* ── Story ── */
-  .story-body {
-    font-family: 'Playfair Display', serif;
-    font-size: 15px; line-height: 2;
-    color: var(--parch-dim);
-  }
-  .story-body p { margin-bottom: .9rem; }
-  .story-body p:last-child { margin-bottom: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
 
-  /* ── Evidence chips ── */
-  .evidence-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(200,150,12,.12); }
-  .ev-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 120px; }
-  .ev-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--fog); font-family: 'DM Mono', monospace; }
-  .ev-chips { display: flex; gap: 5px; flex-wrap: wrap; }
-  .chip {
-    padding: 3px 9px; border-radius: 20px; font-size: 11px;
-    border: 1px solid rgba(200,150,12,.2); color: var(--parch-dim);
-    font-family: 'DM Mono', monospace; text-transform: capitalize;
-  }
+body {
+  font-family: 'Press Start 2P', monospace;
+  background: var(--ui-bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
 
-  /* ── Tabs ── */
-  .tabs { display: flex; gap: 3px; margin-bottom: -1px; }
-  .tab {
-    padding: 9px 18px;
-    background: transparent;
-    border: 1px solid rgba(200,150,12,.18); border-bottom: none;
-    border-radius: 4px 4px 0 0;
-    color: var(--fog); font-family: 'DM Mono', monospace;
-    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
-    cursor: pointer; transition: all .18s;
-  }
-  .tab:hover { color: var(--parch); }
-  .tab.active { background: rgba(200,150,12,.1); border-color: rgba(200,150,12,.35); color: var(--gold); }
-  .tab-panels { border: 1px solid rgba(200,150,12,.2); border-radius: 0 4px 4px 4px; }
-  .panel { display: none; padding: 1.4rem 1.6rem; }
-  .panel.active { display: block; }
+#game-canvas {
+  width: 100%;
+  max-width: 1200px;   /* bem maior */
+  margin: 20px auto;
+  position: relative;
+}
 
-  /* ── Suspect selector ── */
-  .suspect-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 1rem; }
-  .sus-btn {
-    padding: 10px 8px; text-align: center;
-    background: transparent;
-    border: 1px solid rgba(200,150,12,.2); border-radius: var(--radius);
-    color: var(--fog); font-family: 'DM Sans', sans-serif; font-size: 13px;
-    cursor: pointer; transition: all .18s;
-  }
-  .sus-btn:hover, .sus-btn.selected {
-    background: rgba(139,26,26,.2);
-    border-color: var(--blood-lt); color: var(--parch);
-  }
-  .sus-btn .sus-icon { display: block; font-size: 22px; margin-bottom: 4px; }
+#scene {
+  width: 100%;
+  height: 60vh;
+  aspect-ratio: 16/9;
+  position: relative;
+  overflow: hidden;
+  border: 3px solid var(--ui-border);
+  border-bottom: none;
+  background: #000;
+}
 
-  /* ── Question area ── */
-  .q-row { display: flex; gap: 8px; align-items: flex-end; }
-  .q-row textarea { flex: 1; height: 72px; }
+.lightning {
+  position: absolute; top: 0; left: 50%; width: 3px; height: 60%;
+  background: #fff8; transform-origin: top;
+  clip-path: polygon(0 0,3px 0,8px 40%,5px 40%,10px 100%,7px 100%,3px 50%,6px 50%);
+  animation: bolt 8s infinite;
+  opacity: 0; z-index: 2;
+}
+@keyframes bolt { 0%,94%,100%{opacity:0} 95%,97%{opacity:1} 96%,98%{opacity:0} }
 
-  /* ── Chat log ── */
-  .log { display: flex; flex-direction: column; gap: 14px; max-height: 380px; overflow-y: auto; padding-right: 4px; }
-  .log-entry {}
-  .log-who { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--fog); font-family: 'DM Mono', monospace; margin-bottom: 4px; }
-  .log-bubble {
-    font-family: 'Playfair Display', serif;
-    font-size: 14px; line-height: 1.75;
-    color: var(--parch-dim); padding: 10px 14px;
-    border-left: 2px solid; border-radius: 0 4px 4px 0;
-    background: rgba(255,255,255,.03);
-  }
-  .log-bubble.player   { border-color: rgba(155,155,155,.4); }
-  .log-bubble.suspect  { border-color: var(--blood-lt); }
-  .log-bubble.hint     { border-color: var(--gold); }
-  .log-bubble.system   { border-color: var(--fog); font-style: italic; font-size: 13px; }
-  .log-sep { border: none; border-top: 1px solid rgba(200,150,12,.1); margin: 2px 0; }
+.rain {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-linear-gradient(175deg, transparent 0, transparent 4px, rgba(180,200,255,.18) 4px, rgba(180,200,255,.18) 5px);
+  background-size: 20px 20px;
+  animation: rainfall .4s linear infinite;
+  z-index: 3;
 
-  /* ── Accusation form ── */
-  .acc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 1rem; }
-  .acc-group label {
-    display: block; font-size: 10px; letter-spacing: 1.5px;
-    text-transform: uppercase; color: var(--fog);
-    font-family: 'DM Mono', monospace; margin-bottom: 5px;
-  }
-  #acc-result { margin-top: 1rem; }
+}
+@keyframes rainfall { to { background-position: 0 40px; } }
 
-  /* ── Result overlay ── */
-  .result-overlay {
-    position: fixed; inset: 0; z-index: 100;
-    background: rgba(10,7,3,.92);
-    display: flex; align-items: center; justify-content: center;
-    padding: 1rem;
-  }
-  .result-box {
-    max-width: 500px; width: 100%; text-align: center;
-    background: #1f170b;
-    border: 1px solid rgba(200,150,12,.35);
-    border-radius: 6px; padding: 2.5rem 2rem;
-  }
-  .result-icon { font-size: 56px; display: block; margin-bottom: 1rem; }
-  .result-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 2rem; margin-bottom: .4rem;
-  }
-  .result-title.win  { color: var(--gold); }
-  .result-title.lose { color: var(--blood-lt); }
-  .result-detail { font-size: 12px; color: var(--fog); font-family: 'DM Mono', monospace; margin-bottom: 1.5rem; letter-spacing: 1px; }
-  .sol-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 1.2rem 0; }
-  .sol-item { border: 1px solid rgba(200,150,12,.25); border-radius: var(--radius); padding: 10px; text-align: left; }
-  .sol-item .s-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--fog); margin-bottom: 4px; font-family: 'DM Mono', monospace; }
-  .sol-item .s-val { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--gold); text-transform: capitalize; }
+.game-background {
+  position: absolute; inset: 0;
+  background-image: url("{% static 'img/fundo.png' %}");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  z-index: 1;
+ 
+}
 
-  /* ── Game over state (inline banner) ── */
-  .over-banner {
-    background: rgba(139,26,26,.15);
-    border: 1px solid rgba(192,57,43,.3);
-    border-radius: var(--radius); padding: 14px 18px;
-    margin-bottom: 1.5rem; font-size: 14px;
-  }
+/* ── DIALOGUE BOX ── */
+#dialogue-box {
+  width: 100%;
+  background: var(--ui-bg);
+  border: 3px solid var(--ui-border);
+  border-top: none;
+  padding: 10px 14px 12px;
+  min-height: 110px;
+  position: relative;
+  display: flex;          /* adiciona */
+  align-items: flex-start; /* adiciona */
+  gap: 12px;              /* adiciona */
+}
 
-  @media(max-width:520px){
-    .acc-grid, .sol-grid { grid-template-columns: 1fr; }
-    .suspect-grid { grid-template-columns: repeat(3,1fr); }
-  }
+.dlg-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dlg-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dlg-name {
+  font-size: 7px; letter-spacing: 1px;
+  color: var(--gold2);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--gold);
+  padding-bottom: 3px;
+}
+.dlg-portrait {
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  background: transparent;
+  border: none;
+  flex-shrink: 0;
+}
+.dlg-text {
+  font-size: 10px; line-height: 1.9;
+  color: var(--cream);
+  min-height: 40px;
+}
+.dlg-text .cursor {
+  display: inline-block;
+  width: 7px; height: 10px;
+  background: var(--cream);
+  animation: blink .6s step-end infinite;
+  vertical-align: bottom; margin-left: 2px;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.dlg-arrow {
+  position: absolute; bottom: 8px; right: 12px;
+  font-size: 8px; color: var(--gold);
+  animation: bounce-arrow .8s infinite;
+}
+@keyframes bounce-arrow { 0%,100%{transform:translateY(0)} 50%{transform:translateY(3px)} }
+
+/* ── HUD ── */
+#hud {
+  width: 100%;
+  margin: 0 auto;
+  background: #0f0f1e;
+  border: 3px solid var(--ui-border);
+  border-top: none;
+  padding: 6px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex-wrap: wrap;
+}
+.hud-label { font-size: 8px; color: var(--gold); letter-spacing: 1px; }
+.hud-val   { font-size: 8px; color: var(--cream); margin-top: 2px; }
+.hud-hearts { display: flex; gap: 3px; }
+.heart { font-size: 15px; line-height: 1; }
+.heart.empty { opacity: .25; }
+
+/* ── MENU ── */
+#menu-panel {
+  width: 100%;
+  margin: 0 auto;
+  background: #0f0f1e;
+  border: 3px solid var(--ui-border);
+  border-top: none;
+  padding: 8px 14px 12px;
+}
+.menu-tabs { display: flex; gap: 2px; margin-bottom: 8px; }
+.mtab {
+  padding: 5px 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; letter-spacing: .5px;
+  background: #1a1a30;
+  border: 2px solid #333;
+  color: #888; cursor: pointer;
+  transition: all .1s;
+  text-transform: uppercase;
+}
+.mtab:hover { border-color: var(--gold); color: var(--gold); }
+.mtab.active { background: #2a2a50; border-color: var(--gold2); color: var(--gold2); }
+
+.mpanel { display: none; }
+.mpanel.active { display: block; }
+
+/* ── SUSPECTS ── */
+.suspects-grid {
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px; 
+    margin-bottom: 20px;
+    flex-grow: 1; /* Faz a grid ocupar o espaço de cima */
+    overflow-y: auto; /* Se tiver muitos suspeitos, cria scroll só neles */
+}
+.sus-card {
+  background: #1a1a30;
+  border: 2px solid #333;
+  padding: 8px 6px; text-align: center;
+  cursor: pointer; transition: border-color .1s;
+
+}
+.sus-card:hover { border-color: var(--gold); }
+.sus-card.selected { border-color: var(--gold2); background: #2a2050; }
+.sus-avatar {
+  width: 10vw; height: auto;
+  margin: 0 auto 4px;
+  display: block;
+  image-rendering: pixelated;
+}
+.sus-name  { font-size: 9px; color: var(--cream); }
+.sus-papel { font-size: 8px; color: #888; margin-top: 4px; }
+
+/* ── INPUT ── */
+.q-area { 
+    display: flex; 
+    gap: 10px; 
+    align-items: center; /* Alinha o botão com o centro da textarea */
+    margin-top: auto; /* Empurra para o fim do container flex */
+    padding-top: 15px;
+    border-top: 1px solid #333; /* Opcional: uma linha sutil para separar */
+}
+
+.q-area textarea {
+    flex: 1; 
+    height: 60px; /* Um pouco mais alto para facilitar a leitura */
+    background: #1a1a30; 
+    border: 2px solid #444;
+    color: var(--cream);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; 
+    padding: 10px; 
+    resize: none; 
+    outline: none;
+}
+.q-area textarea:focus { border-color: var(--gold); }
+.q-area textarea::placeholder { color: #555; }
+
+.rpg-btn {
+  padding: 8px 10px;
+  background: #2a1a00;
+  border: 2px solid var(--gold);
+  color: var(--gold2);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5px; cursor: pointer;
+  transition: all .1s; white-space: nowrap;
+  text-transform: uppercase;
+}
+.rpg-btn:hover { background: var(--gold); color: #000; }
+.rpg-btn:disabled { opacity: .4; cursor: not-allowed; }
+.rpg-btn.danger { border-color: #c00; color: #f66; background: #1a0000; }
+.rpg-btn.danger:hover { background: #c00; color: #fff; }
+
+/* ── ACCUSATION ── */
+.acc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px; }
+.acc-group { display: flex; flex-direction: column; gap: 4px; }
+.acc-group label { font-size: 10px; color: var(--gold); letter-spacing: .5px; }
+.acc-group select {
+  background: #1a1a30; border: 2px solid #444;
+  color: var(--cream); font-family: 'Press Start 2P', monospace;
+  font-size: 10px; padding: 5px 4px; outline: none;
+  appearance: none; cursor: pointer;
+}
+.acc-group select:focus { border-color: var(--gold); }
+option { background: #0f0f1e; }
+
+/* ── LOG ── */
+/* ── LOG ── */
+.log-list {
+  max-height: 400px; 
+  overflow-y: auto;
+  display: flex; 
+  flex-direction: column; 
+  gap: 20px; /* Aumentei o espaço entre cada par de pergunta/resposta */
+  padding: 10px;
+}
+
+.log-list::-webkit-scrollbar { width: 4px; }
+.log-list::-webkit-scrollbar-thumb { background: var(--gold); }
+
+.log-entry-item { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 8px; 
+  padding-bottom: 15px;
+  border-bottom: 1px solid #222; /* Linha sutil para separar os blocos de conversa */
+}
+
+.log-who { 
+  font-size: 10px; 
+  color: var(--gold); 
+  margin-bottom: 4px; 
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+
+.log-q { 
+  font-size: 10px; 
+  color: #aaa; 
+  padding: 8px 12px; 
+  background: #0a0a0a; 
+  border-left: 3px solid #444; 
+  margin-left: 10px;
+  line-height: 1.4;
+}
+
+.log-r { 
+  font-size: 10px; 
+  color: var(--cream); 
+  padding: 8px 12px; 
+  background: #161625; 
+  border-left: 3px solid var(--blood); 
+  margin-left: 10px;
+  line-height: 1.6;
+}
+
+.log-empty { font-size: 10px; color: #555; font-style: italic; text-align: center; margin-top: 20px; }
+
+/* ── RESULT ── */
+#result-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.92);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.result-window {
+  max-width: 400px; width: 100%;
+  background: #0f0f1e;
+  border: 4px solid var(--ui-border);
+  padding: 24px 20px; text-align: center;
+}
+.result-sprite { display: flex; justify-content: center; margin-bottom: 12px; gap: 12px; }
+.result-title { font-size: 13px; margin-bottom: 8px; animation: title-flash 1s infinite; }
+.result-title.win  { color: var(--gold2); }
+.result-title.lose { color: #c00; }
+@keyframes title-flash { 0%,100%{opacity:1} 50%{opacity:.7} }
+.result-sub { font-size: 8px; color: #888; margin-bottom: 16px; line-height: 2; }
+.sol-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.sol-table td { font-size: 10px; padding: 5px 8px; border: 1px solid #333; }
+.sol-table .sol-key { color: var(--gold); text-transform: uppercase; letter-spacing: 1px; }
+.sol-table .sol-val { color: var(--cream); text-transform: capitalize; }
+.result-blink { animation: blink .8s step-end infinite; font-size: 12px; color: var(--gold); }
+
+/* ── LOADING DOTS ── */
+.ldots span {
+  display: inline-block; width: 4px; height: 4px;
+  background: var(--gold); margin: 0 2px;
+  animation: blink 1s infinite;
+}
+.ldots span:nth-child(2) { animation-delay: .2s; }
+.ldots span:nth-child(3) { animation-delay: .4s; }
+
+/* ── START ── */
+#start-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: #0f0f1e;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+  text-align: center;
+}
+.title-big {
+  font-size: clamp(18px, 5vw, 28px);
+  color: var(--gold2);
+  text-shadow: 3px 3px 0 var(--gold), 6px 6px 0 #5a3000;
+  animation: title-flash 2s infinite;
+}
+.start-sub { font-size: 6px; color: #888; line-height: 2.5; max-width: 320px; }
+
+@media (max-width: 480px) {
+  .acc-grid { grid-template-columns: 1fr; }
+  .dlg-text { font-size: 5px; }
+  .sus-avatar { width: 64px; height: 64px; }
+}
+
+.press { font-size: 10px; color: #f0e8c8; animation: blink 1s step-end infinite; margin-top: .5rem; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{% if game_over %}
-<!-- ── Result overlay ── -->
-<div class="result-overlay" id="result-overlay">
-  <div class="result-box">
-    <span class="result-icon">{% if vitoria %}🎉{% else %}💀{% endif %}</span>
-    <div class="result-title {% if vitoria %}win{% else %}lose{% endif %}">
-      {% if vitoria %}Mistério Resolvido!{% else %}O culpado fugiu.{% endif %}
+{# Serializa personagens como JSON seguro — sem risco de erro de vírgula no JS #}
+{{ personagens_lista|json_script:"personagens-data" }}
+
+<!-- ── START SCREEN ── -->
+<div id="start-overlay">
+  <div>
+    <img src="{% static 'img/detetive.png' %}" width="200" height="200"
+         style="image-rendering:pixelated; margin-bottom:16px;">
+  </div>
+  <div class="title-big">Código de Silêncio</div>
+  <div class="start-sub">
+    MISTÉRIO NA MANSÃO<br><br>
+    UMA TEMPESTADE. UM CORPO.<br>
+    VOCÊ TEM 5 TENTATIVAS.
+  </div>
+  <button class="rpg-btn" style="font-size:7px;padding:12px 20px;" onclick="startGame()">
+    ▶ PRESS START
+  </button>
+  <div class="press">PRESS START</div>
+</div>
+
+<!-- ── GAME CANVAS ── -->
+<div id="game-canvas" style="display:none;">
+
+  <div id="scene">
+    <div class="game-background"></div>
+    <div class="lightning"></div>
+    <div class="rain"></div>
+  </div>
+
+  <!-- Dialogue box -->
+<div id="dialogue-box">
+  <div class="dlg-header">
+    <canvas class="dlg-portrait" id="dlg-portrait" width="96" height="96"></canvas>
+    <div class="dlg-name" id="dlg-name"></div>
+  </div>
+  <div class="dlg-body">
+    <div class="dlg-text" id="dlg-text">
+      <span class="cursor"></span>
     </div>
-    <div class="result-detail">
-      {% if vitoria %}
-        Caso encerrado em {{ tentativas }} tentativa{{ tentativas|pluralize:"s" }} e {{ historico|length }} interrogatório{{ historico|length|pluralize:"s" }}.
+  </div>
+  <div class="dlg-arrow" id="dlg-arrow" style="display:none;">▼</div>
+</div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div>
+      <div class="hud-label">TENTATIVAS</div>
+      <div class="hud-hearts" id="hud-hearts">
+        {% for d in dots %}
+        <span class="heart {% if d == 'used' %}empty{% endif %}">♥</span>
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <div class="hud-label">INTERROGATÓRIOS</div>
+      <div class="hud-val" id="hud-inq">{{ historico|length }}</div>
+    </div>
+    <div>
+      <div class="hud-label">SUSPEITO ATIVO</div>
+      <div class="hud-val" id="hud-sus">—</div>
+    </div>
+    <div style="margin-left:auto;">
+      <form method="post" action="{% url 'reiniciar' %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="rpg-btn" style="font-size:10px;padding:5px 8px;">↺ REINICIAR</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Menu panel -->
+  <div id="menu-panel">
+    <div class="menu-tabs">
+      <button class="mtab active" onclick="switchTab('interrogar')">🗣 INTERROGAR</button>
+      <button class="mtab" onclick="switchTab('acusar')">⚖ ACUSAR</button>
+      <button class="mtab" onclick="switchTab('historico')">📋 HISTÓRICO</button>
+      <button class="mtab" onclick="switchTab('historia')">📜 CASO</button>
+    </div>
+
+    <!-- INTERROGAR -->
+    <div class="mpanel active" id="mpanel-interrogar">
+      <div class="suspects-grid">
+        {% for p in personagens_lista %}
+        <div class="sus-card" id="card-{{ p.id }}"
+             onclick="selectSuspect('{{ p.id }}', '{{ p.nome }}', this)">
+          <img class="sus-avatar"
+               src="{% if p.genero == 'f' %}{% static 'img/menina2.png' %}{% else %}{% static 'img/menino.png' %}{% endif %}"
+               alt="{{ p.nome }}">
+          <div class="sus-name">{{ p.nome|upper }}</div>
+          <div class="sus-papel">{{ p.papel|upper }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="q-area">
+        <textarea id="q-input" disabled
+          placeholder="CLIQUE EM UM SUSPEITO..."></textarea>
+        <button class="rpg-btn" id="ask-btn" onclick="askSuspect()" disabled>ASK ▶</button>
+      </div>
+    </div>
+
+    <!-- ACUSAR -->
+    <div class="mpanel" id="mpanel-acusar">
+      {% if not game_over %}
+      <div class="acc-grid">
+        <div class="acc-group">
+          <label>★ CULPADO</label>
+          <select id="acc-pessoa">
+            <option value="">???</option>
+            {% for p in personagens_lista %}
+            <option value="{{ p.nome }}">{{ p.nome|upper }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="acc-group">
+          <label>★ ARMA</label>
+          <select id="acc-arma">
+            <option value="">???</option>
+            {% for a in armas %}<option value="{{ a }}">{{ a|upper }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="acc-group">
+          <label>★ LOCAL</label>
+          <select id="acc-local">
+            <option value="">???</option>
+            {% for l in locais %}<option value="{{ l }}">{{ l|upper }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <button class="rpg-btn danger" id="acc-btn" onclick="makeAccusation()">
+        ⚔ ACUSAR FORMALMENTE
+      </button>
+      <div id="acc-result" style="margin-top:8px;"></div>
       {% else %}
-        Após {{ max_tentativas }} tentativas, o caso permanece em aberto.
+      <div style="font-size:5px; color:#555;">JOGO ENCERRADO. REINICIE PARA JOGAR NOVAMENTE.</div>
+      {% endif %}
+    </div>
+
+    <!-- HISTORICO -->
+    <div class="mpanel" id="mpanel-historico">
+      <div class="log-list" id="hist-log">
+        {% if historico %}
+          {% for e in historico %}
+          <div class="log-entry-item">
+            <div class="log-who">▶ {{ e.nome|upper }}</div>
+            <div class="log-q">{{ e.pergunta }}</div>
+            <div class="log-r">{{ e.resposta }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="log-empty">NENHUM INTERROGATÓRIO AINDA.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- HISTORIA -->
+    <div class="mpanel" id="mpanel-historia">
+      <div id="story-body"
+           style="font-size:5px; line-height:2.2; color:var(--cream);
+                  max-height:200px; overflow-y:auto; padding-right:4px; font-size: 10px;">
+        {% for para in historia_paragrafos %}
+        <p class="story-paragraph" style="margin-bottom:8px;">{{ para }}</p>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div><!-- /menu-panel -->
+</div><!-- /game-canvas -->
+
+<!-- ── RESULT OVERLAY server-side ── -->
+{% if game_over %}
+<div id="result-overlay">
+  <div class="result-window">
+    <div class="result-sprite">
+      <img src="{% static 'img/detetive.png' %}" width="52" height="52" style="image-rendering:pixelated;">
+      {% if vitoria %}
+      <div style="font-size:32px; align-self:center;">🏆</div>
+      {% else %}
+      <div style="font-size:32px; align-self:center;">💀</div>
+      {% endif %}
+    </div>
+    <div class="result-title {% if vitoria %}win{% else %}lose{% endif %}">
+      {% if vitoria %}CASO RESOLVIDO!{% else %}GAME OVER{% endif %}
+    </div>
+    <div class="result-sub">
+      {% if vitoria %}
+        PARABÉNS DETETIVE!<br>CASO ENCERRADO EM {{ tentativas }} TENTATIVA(S).
+      {% else %}
+        O CULPADO ESCAPOU NA TEMPESTADE...<br>INVESTIGAÇÃO ENCERRADA.
       {% endif %}
     </div>
     {% if solucao %}
-    <div class="sol-grid">
-      <div class="sol-item"><div class="s-label">Culpado</div><div class="s-val">{{ solucao.pessoa }}</div></div>
-      <div class="sol-item"><div class="s-label">Arma</div><div class="s-val">{{ solucao.arma }}</div></div>
-      <div class="sol-item"><div class="s-label">Local</div><div class="s-val">{{ solucao.local }}</div></div>
-    </div>
+    <table class="sol-table">
+      <tr><td class="sol-key">CULPADO</td><td class="sol-val">{{ solucao.pessoa }}</td></tr>
+      <tr><td class="sol-key">ARMA</td><td class="sol-val">{{ solucao.arma }}</td></tr>
+      <tr><td class="sol-key">LOCAL</td><td class="sol-val">{{ solucao.local }}</td></tr>
+    </table>
     {% endif %}
-    <form method="post" action="{% url 'reiniciar' %}" style="display:inline;">
+    <form method="post" action="{% url 'reiniciar' %}">
       {% csrf_token %}
-      <button type="submit" class="btn btn-lg">Novo mistério →</button>
+      <button type="submit" class="rpg-btn" style="font-size:6px; padding:10px 16px;">
+        ▶ NOVO MISTÉRIO
+      </button>
     </form>
+    <div class="result-blink" style="margin-top:10px;">PRESS START</div>
   </div>
 </div>
 {% endif %}
-
-<!-- ── Header ── -->
-<div class="game-header">
-  <div>
-    <p class="eyebrow" style="margin-bottom:.3rem;">🕯 Investigação em curso</p>
-    <h1>Murdle</h1>
-  </div>
-  <div class="header-right">
-    <span class="attempts-label">Tentativas</span>
-    <div class="dots-bar">
-      {% for d in dots %}
-      <div class="dot {{ d }}"></div>
-      {% endfor %}
-    </div>
-    <form method="post" action="{% url 'reiniciar' %}" style="margin-left:8px;">
-      {% csrf_token %}
-      <button type="submit" class="btn" title="Reiniciar">↺ Reiniciar</button>
-    </form>
-  </div>
-</div>
-
-<!-- ── Story card ── -->
-<div class="card" style="margin-bottom:1.5rem;">
-  <p class="eyebrow" style="margin-bottom:.9rem;">📜 Relatório do crime</p>
-  <div class="story-body">
-    {% for para in historia_paragrafos %}
-    <p>{{ para }}</p>
-    {% endfor %}
-  </div>
-  <div class="evidence-row">
-    <div class="ev-group">
-      <span class="ev-label">Suspeitos</span>
-      <div class="ev-chips">
-        {% for p in personagens %}<span class="chip">{{ p }}</span>{% endfor %}
-      </div>
-    </div>
-    <div class="ev-group">
-      <span class="ev-label">Armas</span>
-      <div class="ev-chips">
-        {% for a in armas %}<span class="chip">{{ a }}</span>{% endfor %}
-      </div>
-    </div>
-    <div class="ev-group">
-      <span class="ev-label">Locais</span>
-      <div class="ev-chips">
-        {% for l in locais %}<span class="chip">{{ l }}</span>{% endfor %}
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Tabs ── -->
-<div class="tabs">
-  <button class="tab active" onclick="switchTab('interrogar')">🗣 Interrogar</button>
-  <button class="tab" onclick="switchTab('acusar')">⚖️ Acusar</button>
-  <button class="tab" onclick="switchTab('historico')">📋 Histórico</button>
-</div>
-
-<div class="tab-panels">
-
-  <!-- ── INTERROGATION panel ── -->
-  <div class="panel active" id="panel-interrogar">
-    <p class="eyebrow" style="margin-bottom:.9rem;">Escolha um suspeito</p>
-    <div class="suspect-grid">
-      <button class="sus-btn" onclick="selectSuspect('mordomo', this)">
-        <span class="sus-icon">🤵</span>Mordomo
-      </button>
-      <button class="sus-btn" onclick="selectSuspect('herdeira', this)">
-        <span class="sus-icon">👩</span>Herdeira
-      </button>
-      <button class="sus-btn" onclick="selectSuspect('jardineiro', this)">
-        <span class="sus-icon">👨‍🌾</span>Jardineiro
-      </button>
-    </div>
-    <div class="q-row">
-      <textarea id="q-input" disabled
-        placeholder="Onde você estava quando o crime ocorreu?&#10;Você viu alguém naquela noite?&#10;O que você sabe sobre a arma?"></textarea>
-      <button class="btn" id="ask-btn" onclick="askSuspect()" disabled>Perguntar →</button>
-    </div>
-    <div id="inq-result" style="margin-top:1rem;"></div>
-  </div>
-
-  <!-- ── ACCUSATION panel ── -->
-  <div class="panel" id="panel-acusar">
-    {% if not game_over %}
-    <p class="eyebrow" style="margin-bottom:.9rem;">Faça sua acusação formal</p>
-    <div class="acc-grid">
-      <div class="acc-group">
-        <label>Culpado</label>
-        <select id="acc-pessoa">
-          <option value="">Selecione...</option>
-          {% for p in personagens %}<option value="{{ p }}">{{ p|capfirst }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="acc-group">
-        <label>Arma</label>
-        <select id="acc-arma">
-          <option value="">Selecione...</option>
-          {% for a in armas %}<option value="{{ a }}">{{ a|capfirst }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="acc-group">
-        <label>Local</label>
-        <select id="acc-local">
-          <option value="">Selecione...</option>
-          {% for l in locais %}<option value="{{ l }}">{{ l|capfirst }}</option>{% endfor %}
-        </select>
-      </div>
-    </div>
-    <button class="btn btn-blood" id="acc-btn" onclick="makeAccusation()">Acusar formalmente →</button>
-    <div id="acc-result"></div>
-    {% else %}
-    <p style="color:var(--fog); font-size:14px; font-style:italic;">O jogo encerrou. Inicie uma nova investigação.</p>
-    {% endif %}
-  </div>
-
-  <!-- ── HISTORY panel ── -->
-  <div class="panel" id="panel-historico">
-    <p class="eyebrow" style="margin-bottom:.9rem;">Histórico de interrogatórios</p>
-    <div class="log" id="hist-log">
-      {% if historico %}
-        {% for e in historico %}
-        <div class="log-entry">
-          <div class="log-who">🕵️ Detetive → {{ e.personagem|upper }}</div>
-          <div class="log-bubble player">{{ e.pergunta }}</div>
-          <div class="log-who" style="margin-top:6px;">{{ e.personagem|upper }} responde</div>
-          <div class="log-bubble suspect">{{ e.resposta }}</div>
-        </div>
-        {% if not forloop.last %}<hr class="log-sep">{% endif %}
-        {% endfor %}
-      {% else %}
-        <div class="log-bubble system">Nenhum interrogatório realizado ainda.</div>
-      {% endif %}
-    </div>
-  </div>
-
-</div><!-- tab-panels -->
 
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const CSRF = '{{ csrf_token }}';
-let selectedSuspect = null;
+// ── Personagens via json_script — sem problema de vírgula ou caractere especial ──
+const PERSONAGENS_RAW = JSON.parse(
+  document.getElementById('personagens-data').textContent
+);
+// Transforma lista em mapa  pid → {nome, genero, papel}
+const PERSONAGENS = {};
+PERSONAGENS_RAW.forEach(function(p) {
+  PERSONAGENS[p.id] = { nome: p.nome, genero: p.genero, papel: p.papel };
+});
 
-// ── Tab switching ────────────────────────────────────────────────
+// ── Caminhos das imagens ──────────────────────────────────────────────────
+const IMG_DETETIVE = '{% static "img/detetive.png" %}';
+const IMG_M        = '{% static "img/menino.png" %}';
+const IMG_F        = '{% static "img/menina2.png" %}';
+
+// Detetive → cachorro | suspeito → imagem pelo gênero vindo do LLM
+function getPortraitSrc(pid) {
+  if (pid === 'detetive') return IMG_DETETIVE;
+  var p = PERSONAGENS[pid];
+  if (!p) return IMG_DETETIVE;
+  return p.genero === 'f' ? IMG_F : IMG_M;
+}
+
+// ── Estado global ─────────────────────────────────────────────────────────
+var CSRF        = '{{ csrf_token }}';
+var selectedPid = null;
+var typingTimer = null;
+
+// ── Narração da história ──────────────────────────────────────────────────
+var historiaParas = [];
+var historiaIndex = 0;
+
+function carregarHistoria() {
+  var els = document.querySelectorAll('#story-body .story-paragraph');
+  historiaParas = Array.from(els).map(function(el) {
+    return el.textContent.trim();
+  }).filter(Boolean);
+}
+
+function narrarHistoria() {
+  if (historiaIndex >= historiaParas.length) return;
+
+  var texto = historiaParas[historiaIndex];
+  typeText(texto, 'detetive');
+
+  // Aguarda a seta aparecer e captura o próximo clique para avançar
+  var arrowEl = document.getElementById('dlg-arrow');
+  var aguardar = setInterval(function() {
+    if (arrowEl.style.display === 'block') {
+      clearInterval(aguardar);
+      // Delay pequeno para não capturar o mesmo clique que abriu o jogo
+      setTimeout(function() {
+        document.addEventListener('click', function avanca() {
+          document.removeEventListener('click', avanca);
+          historiaIndex++;
+          narrarHistoria();
+        }, { once: true });
+      }, 250);
+    }
+  }, 100);
+}
+
+// ── Typewriter ────────────────────────────────────────────────────────────
+function typeText(texto, pid) {
+  // Para digitação anterior
+  if (typingTimer) { clearInterval(typingTimer); typingTimer = null; }
+
+  var nameEl     = document.getElementById('dlg-name');
+  var textEl     = document.getElementById('dlg-text');
+  var arrowEl    = document.getElementById('dlg-arrow');
+  var portraitEl = document.getElementById('dlg-portrait');
+
+  // Define nome no header
+  if (pid === 'detetive') {
+    nameEl.textContent = 'DETETIVE';
+  } else {
+    var p = PERSONAGENS[pid];
+    nameEl.textContent = p ? p.nome.toUpperCase() : pid.toUpperCase();
+  }
+
+  textEl.innerHTML = '';
+  arrowEl.style.display = 'none';
+
+  // Desenha retrato correto
+  drawPortrait(portraitEl, pid);
+
+  // Digita caractere a caractere
+  var i = 0;
+  var cursor = document.createElement('span');
+  cursor.className = 'cursor';
+
+  typingTimer = setInterval(function() {
+    if (i < texto.length) {
+      textEl.textContent += texto[i++];
+      textEl.appendChild(cursor);
+    } else {
+      clearInterval(typingTimer);
+      typingTimer = null;
+      arrowEl.style.display = 'block';
+    }
+  }, 22);
+}
+
+// ── Retrato no canvas ─────────────────────────────────────────────────────
+function drawPortrait(canvas, pid) {
+  var w   = canvas.width;   // pega o tamanho real do canvas (96)
+  var h   = canvas.height;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+
+  var src = getPortraitSrc(pid);
+  var img = new Image();
+
+  img.onload = function() {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, w, h);
+  };
+
+  img.src = '';
+  img.src = src;
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const tabs = ['interrogar', 'acusar', 'historico'];
-  document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('active');
-  document.getElementById('panel-' + name).classList.add('active');
+  var ordem = ['interrogar', 'acusar', 'historico', 'historia'];
+  document.querySelectorAll('.mtab').forEach(function(t, i) {
+    t.classList.toggle('active', ordem[i] === name);
+  });
+  document.querySelectorAll('.mpanel').forEach(function(p) {
+    p.classList.remove('active');
+  });
+  document.getElementById('mpanel-' + name).classList.add('active');
 }
 
-// ── Suspect selection ────────────────────────────────────────────
-function selectSuspect(name, el) {
-  selectedSuspect = name;
-  document.querySelectorAll('.sus-btn').forEach(b => b.classList.remove('selected'));
+// ── Selecionar suspeito ───────────────────────────────────────────────────
+function selectSuspect(pid, nome, el) {
+  selectedPid = pid;
+
+  document.querySelectorAll('.sus-card').forEach(function(c) {
+    c.classList.remove('selected');
+  });
   el.classList.add('selected');
-  document.getElementById('q-input').disabled = false;
-  document.getElementById('ask-btn').disabled = false;
+
+  document.getElementById('hud-sus').textContent = nome.toUpperCase();
+
+  var input = document.getElementById('q-input');
+  var btn   = document.getElementById('ask-btn');
+  input.disabled = false;
+  btn.disabled   = false;
+  input.placeholder = 'PERGUNTE A ' + nome.toUpperCase() + '...';
+  input.focus();
+
+  switchTab('interrogar');
+  typeText(nome.toUpperCase() + '... o que você sabe sobre o crime desta noite?', 'detetive');
 }
 
-// ── Send question (Agente 2) ─────────────────────────────────────
+// ── Interrogar ────────────────────────────────────────────────────────────
 async function askSuspect() {
-  const pergunta = document.getElementById('q-input').value.trim();
-  if (!selectedSuspect || !pergunta) return;
+  var pergunta = document.getElementById('q-input').value.trim();
+  if (!selectedPid || !pergunta) return;
 
-  const btn = document.getElementById('ask-btn');
+  var btn = document.getElementById('ask-btn');
   btn.disabled = true;
-  btn.innerHTML = 'Aguardando <span class="dots"><span></span><span></span><span></span></span>';
+  btn.innerHTML = 'WAIT <span class="ldots"><span></span><span></span><span></span></span>';
 
-  const res = await fetch('{% url "interrogar" %}', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-    body: JSON.stringify({ personagem: selectedSuspect, pergunta }),
-  });
+  typeText('...', 'detetive');
 
-  const data = await res.json();
-  btn.disabled = false; btn.textContent = 'Perguntar →';
-
-  const area = document.getElementById('inq-result');
-  if (data.erro) {
-    area.innerHTML = `<div class="log-bubble system">Erro: ${data.erro}</div>`;
+  var res, data;
+  try {
+    res  = await fetch('{% url "interrogar" %}', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body:    JSON.stringify({ pid: selectedPid, pergunta: pergunta }),
+    });
+    data = await res.json();
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'ASK ▶';
+    typeText('ERRO DE CONEXÃO.', 'detetive');
     return;
   }
 
-  area.innerHTML = `
-    <div class="log-who">${data.personagem.toUpperCase()} responde</div>
-    <div class="log-bubble suspect">${data.resposta}</div>
-  `;
-  document.getElementById('q-input').value = '';
+  btn.disabled = false;
+  btn.textContent = 'ASK ▶';
 
-  // Add to history panel
-  addToHistory(data.personagem, data.pergunta, data.resposta);
+  if (data.erro) {
+    typeText('ERRO: ' + data.erro, 'detetive');
+    return;
+  }
+
+  // Retrato pelo pid retornado — pega gênero certo do mapa
+  typeText(data.resposta, data.pid);
+
+  var inqEl = document.getElementById('hud-inq');
+  inqEl.textContent = parseInt(inqEl.textContent || '0') + 1;
+
+  addToLog(data.nome, data.pergunta, data.resposta);
+  document.getElementById('q-input').value = '';
 }
 
-// ── Make accusation (Agente 3) ───────────────────────────────────
+// ── Acusar ────────────────────────────────────────────────────────────────
 async function makeAccusation() {
-  const pessoa = document.getElementById('acc-pessoa').value;
-  const arma   = document.getElementById('acc-arma').value;
-  const local  = document.getElementById('acc-local').value;
+  var pessoa = document.getElementById('acc-pessoa').value;
+  var arma   = document.getElementById('acc-arma').value;
+  var local  = document.getElementById('acc-local').value;
+
   if (!pessoa || !arma || !local) {
-    document.getElementById('acc-result').innerHTML =
-      '<div class="log-bubble system">Selecione culpado, arma e local.</div>';
+    typeText('VOCÊ PRECISA SELECIONAR CULPADO, ARMA E LOCAL ANTES DE ACUSAR!', 'detetive');
     return;
   }
 
-  const btn = document.getElementById('acc-btn');
+  var btn = document.getElementById('acc-btn');
   btn.disabled = true;
-  btn.innerHTML = 'Verificando <span class="dots"><span></span><span></span><span></span></span>';
+  btn.innerHTML = 'ANALISANDO <span class="ldots"><span></span><span></span><span></span></span>';
 
-  const res = await fetch('{% url "acusar" %}', {
-    method: 'POST',
+  typeText('ENVIANDO ACUSAÇÃO FORMAL...', 'detetive');
+
+  var res  = await fetch('{% url "acusar" %}', {
+    method:  'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-    body: JSON.stringify({ pessoa, arma, local }),
+    body:    JSON.stringify({ pessoa: pessoa, arma: arma, local: local }),
   });
+  var data = await res.json();
 
-  const data = await res.json();
-
-  // Update dots
-  updateDots(data.tentativas, data.max_tentativas);
-
-  const area = document.getElementById('acc-result');
+  updateHearts(data.tentativas, data.max_tentativas);
 
   if (data.resultado === 'acertou') {
     showResult(true, data.tentativas, data.solucao);
     return;
   }
 
-  // Wrong — show feedback + hint
-  const acertosStr = data.acertos.length ? data.acertos.join(', ') : 'nenhum';
-  let html = `
-    <div style="margin-top:.8rem;">
-      <div class="log-who" style="color:var(--blood-lt);">❌ Tentativa ${data.tentativas}/${data.max_tentativas}</div>
-      <div class="log-bubble system">
-        Corretos: <strong>${acertosStr}</strong> &nbsp;|&nbsp; Errados: ${data.erros.join(', ')}
-      </div>
-    </div>`;
+  btn.disabled = false;
+  btn.textContent = '⚔ ACUSAR FORMALMENTE';
 
-  if (data.dica) {
-    html += `
-      <div style="margin-top:.8rem;">
-        <div class="log-who">💡 Investigador sênior</div>
-        <div class="log-bubble hint">${data.dica}</div>
-      </div>`;
-  }
-  area.innerHTML = html;
+  var acStr = data.acertos.length ? data.acertos.join(', ').toUpperCase() : 'NENHUM';
+  document.getElementById('acc-result').innerHTML =
+    '<div style="font-size:10px;color:#f66;margin-bottom:4px;">✗ ERRADO! CORRETOS: ' + acStr + '</div>' +
+    (data.dica ? '<div style="font-size:10px;color:var(--gold2);line-height:2;border-left:2px solid var(--gold);padding-left:6px;margin-top:4px;">' + data.dica + '</div>' : '');
 
-  btn.disabled = false; btn.textContent = 'Acusar formalmente →';
-
-  if (data.solucao) {
-    // Game over - lost
-    setTimeout(() => showResult(false, data.tentativas, data.solucao), 1500);
-  }
+  if (data.dica) typeText(data.dica, 'detetive');
+  if (data.solucao) setTimeout(function() { showResult(false, data.tentativas, data.solucao); }, 2000);
 }
 
-// ── Helpers ──────────────────────────────────────────────────────
-function updateDots(used, total) {
-  const bar = document.querySelector('.dots-bar');
-  bar.innerHTML = Array.from({length: total}, (_, i) =>
-    `<div class="dot ${i < used ? 'used' : 'remaining'}"></div>`
-  ).join('');
+// ── Helpers ───────────────────────────────────────────────────────────────
+function updateHearts(used, total) {
+  document.getElementById('hud-hearts').innerHTML =
+    Array.from({ length: total }, function(_, i) {
+      return '<span class="heart ' + (i < used ? 'empty' : '') + '">♥</span>';
+    }).join('');
 }
 
-function addToHistory(personagem, pergunta, resposta) {
-  const log = document.getElementById('hist-log');
-  // Remove empty state message if present
-  const empty = log.querySelector('.system');
-  if (empty && log.children.length === 1) log.innerHTML = '';
+function addToLog(nome, pergunta, resposta) {
+  var log   = document.getElementById('hist-log');
+  var empty = log.querySelector('.log-empty');
+  if (empty) log.innerHTML = '';
 
-  if (log.children.length) {
-    log.insertAdjacentHTML('beforeend', '<hr class="log-sep">');
-  }
-  log.insertAdjacentHTML('beforeend', `
-    <div class="log-entry">
-      <div class="log-who">🕵️ Detetive → ${personagem.toUpperCase()}</div>
-      <div class="log-bubble player">${pergunta}</div>
-      <div class="log-who" style="margin-top:6px;">${personagem.toUpperCase()} responde</div>
-      <div class="log-bubble suspect">${resposta}</div>
-    </div>
-  `);
+  var div = document.createElement('div');
+  div.className = 'log-entry-item';
+  div.innerHTML =
+    '<div class="log-who">▶ ' + nome.toUpperCase() + '</div>' +
+    '<div class="log-q">'  + pergunta + '</div>' +
+    '<div class="log-r">'  + resposta + '</div>';
+  log.appendChild(div);
   log.scrollTop = log.scrollHeight;
 }
 
 function showResult(win, tentativas, solucao) {
-  // If overlay already exists (server-rendered), just show it
-  const existing = document.getElementById('result-overlay');
+  var existing = document.getElementById('result-overlay');
   if (existing) { existing.style.display = 'flex'; return; }
 
-  // Build overlay dynamically for AJAX result
-  const solHtml = solucao ? `
-    <div class="sol-grid">
-      <div class="sol-item"><div class="s-label">Culpado</div><div class="s-val">${solucao.pessoa}</div></div>
-      <div class="sol-item"><div class="s-label">Arma</div><div class="s-val">${solucao.arma}</div></div>
-      <div class="sol-item"><div class="s-label">Local</div><div class="s-val">${solucao.local}</div></div>
-    </div>` : '';
+  var solRows = solucao
+    ? '<tr><td class="sol-key">CULPADO</td><td class="sol-val">' + solucao.pessoa + '</td></tr>' +
+      '<tr><td class="sol-key">ARMA</td><td class="sol-val">'    + solucao.arma   + '</td></tr>' +
+      '<tr><td class="sol-key">LOCAL</td><td class="sol-val">'   + solucao.local  + '</td></tr>'
+    : '';
 
-  const overlay = document.createElement('div');
-  overlay.className = 'result-overlay';
-  overlay.innerHTML = `
-    <div class="result-box">
-      <span class="result-icon">${win ? '🎉' : '💀'}</span>
-      <div class="result-title ${win ? 'win' : 'lose'}">${win ? 'Mistério Resolvido!' : 'O culpado fugiu.'}</div>
-      <div class="result-detail">${win ? `Caso encerrado em ${tentativas} tentativa(s).` : 'Sem tentativas restantes.'}</div>
-      ${solHtml}
-      <form method="post" action="{% url 'reiniciar' %}" style="display:inline;">
-        <input type="hidden" name="csrfmiddlewaretoken" value="${CSRF}">
-        <button type="submit" class="btn btn-lg">Novo mistério →</button>
-      </form>
-    </div>`;
-  document.body.appendChild(overlay);
+  var ov = document.createElement('div');
+  ov.id = 'result-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:1rem;';
+  ov.innerHTML =
+    '<div class="result-window">' +
+      '<div class="result-sprite">' +
+        '<img src="' + IMG_DETETIVE + '" width="52" height="52" style="image-rendering:pixelated;">' +
+        '<div style="font-size:32px;align-self:center;">' + (win ? '🏆' : '💀') + '</div>' +
+      '</div>' +
+      '<div class="result-title ' + (win ? 'win' : 'lose') + '">' + (win ? 'CASO RESOLVIDO!' : 'GAME OVER') + '</div>' +
+      '<div class="result-sub">' + (win ? 'PARABÉNS DETETIVE!<br>' + tentativas + ' TENTATIVA(S).' : 'O CULPADO ESCAPOU...') + '</div>' +
+      '<table class="sol-table">' + solRows + '</table>' +
+      '<form method="post" action="{% url "reiniciar" %}">' +
+        '<input type="hidden" name="csrfmiddlewaretoken" value="' + CSRF + '">' +
+        '<button type="submit" class="rpg-btn" style="font-size:6px;padding:10px 16px;">▶ NOVO MISTÉRIO</button>' +
+      '</form>' +
+      '<div class="result-blink" style="margin-top:10px;">PRESS START</div>' +
+    '</div>';
+  document.body.appendChild(ov);
 }
 
-// Enter sends question (Shift+Enter = newline)
-document.getElementById('q-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askSuspect(); }
+// ── Start ─────────────────────────────────────────────────────────────────
+function startGame() {
+  document.getElementById('start-overlay').style.display = 'none';
+  document.getElementById('game-canvas').style.display   = 'block';
+
+  carregarHistoria();
+
+  // Aguarda o canvas ficar visível antes de desenhar o retrato e narrar
+  setTimeout(function() {
+    drawPortrait(document.getElementById('dlg-portrait'), 'detetive');
+    setTimeout(narrarHistoria, 100);
+  }, 50);
+}
+
+// ── Enter para enviar pergunta ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  var q = document.getElementById('q-input');
+  if (q) {
+    q.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askSuspect(); }
+    });
+  }
 });
 </script>
 {% endblock %}

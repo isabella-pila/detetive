@@ -20,7 +20,7 @@ import os
 
 def get_llm():
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-2.5-flash-lite",
         temperature=0.7,
         google_api_key=os.getenv("GOOGLE_API_KEY"),
     )
@@ -29,38 +29,32 @@ def get_llm():
 # ==============================
 # ESTADO DO JOGO
 # ==============================
-
 class EstadoJogo:
-    """
-    Estado completo de uma partida.
-    Serializado como dict para armazenar na sessão Django.
-    """
-
-    PERSONAGENS = ["mordomo", "herdeira", "jardineiro"]
-    ARMAS       = ["veneno", "faca", "corda"]
-    LOCAIS      = ["biblioteca", "cozinha", "jardim"]
+    ARMAS  = ["veneno", "faca", "corda"]
+    LOCAIS = ["biblioteca", "cozinha", "jardim"]
 
     def __init__(self):
         self.historia: str = ""
         self.solucao: dict = {}
         self.alibis: dict = {}
-        self.historico: list = []   # [{personagem, pergunta, resposta}]
+        self.personagens: list = []  # [{"id", "nome", "papel", "genero"}]
+        self.historico: list = []
         self.tentativas: int = 0
         self.max_tentativas: int = 5
         self.game_over: bool = False
         self.vitoria: bool = False
 
-    # ── serialização ───────────────────────────────────────────────
     def to_dict(self) -> dict:
         return {
-            "historia": self.historia,
-            "solucao": self.solucao,
-            "alibis": self.alibis,
-            "historico": self.historico,
-            "tentativas": self.tentativas,
+            "historia":       self.historia,
+            "solucao":        self.solucao,
+            "alibis":         self.alibis,
+            "personagens":    self.personagens,
+            "historico":      self.historico,
+            "tentativas":     self.tentativas,
             "max_tentativas": self.max_tentativas,
-            "game_over": self.game_over,
-            "vitoria": self.vitoria,
+            "game_over":      self.game_over,
+            "vitoria":        self.vitoria,
         }
 
     @classmethod
@@ -69,6 +63,7 @@ class EstadoJogo:
         obj.historia       = data.get("historia", "")
         obj.solucao        = data.get("solucao", {})
         obj.alibis         = data.get("alibis", {})
+        obj.personagens    = data.get("personagens", [])
         obj.historico      = data.get("historico", [])
         obj.tentativas     = data.get("tentativas", 0)
         obj.max_tentativas = data.get("max_tentativas", 5)
@@ -76,27 +71,29 @@ class EstadoJogo:
         obj.vitoria        = data.get("vitoria", False)
         return obj
 
-    # ── helpers ────────────────────────────────────────────────────
+    def get_personagem(self, pid: str) -> dict | None:
+        """Busca personagem pelo id (p1, p2, p3)."""
+        return next((p for p in self.personagens if p["id"] == pid), None)
+
     def registrar_interrogatorio(self, personagem: str, pergunta: str, resposta: str):
         self.historico.append({
             "personagem": personagem,
-            "pergunta": pergunta,
-            "resposta": resposta,
+            "pergunta":   pergunta,
+            "resposta":   resposta,
         })
 
     def resumo_historico(self) -> str:
         if not self.historico:
             return "Nenhum interrogatório realizado ainda."
         return "\n".join(
-            f"[{e['personagem'].upper()}] P: {e['pergunta']} | R: {e['resposta']}"
+            f"[{e.get('nome', e.get('personagem','?')).upper()}] P: {e['pergunta']} | R: {e['resposta']}"
             for e in self.historico
         )
 
     @property
     def tentativas_restantes(self) -> int:
         return self.max_tentativas - self.tentativas
-
-
+    
 # ==============================
 # AGENTE 1 — Narrador / Criador da História
 # ==============================
@@ -105,7 +102,8 @@ _story_prompt = ChatPromptTemplate.from_messages([
     ("system", """Você é o narrador de um jogo de mistério de assassinato no estilo Murdle.
 Gere um mistério curto e atmosférico. O crime ocorreu em uma mansão durante uma tempestade.
 
-Personagens (escolha UM como culpado): mordomo, herdeira, jardineiro
+Crie 3 personagens únicos com nomes e papéis inventados por você.
+Para cada personagem, defina: nome (ex: "Conde Viktor"), papel (ex: "mordomo"), gênero ("m" ou "f").
 Locais (escolha UM): biblioteca, cozinha, jardim
 Armas (escolha UMA): veneno, faca, corda
 
@@ -118,13 +116,18 @@ Regras:
 Formato:
 {{
   "historia": "3 parágrafos atmosféricos",
-  "pessoa": "mordomo|herdeira|jardineiro",
+  "personagens": [
+    {{"id": "p1", "nome": "Nome Inventado", "papel": "papel na mansão", "genero": "m"}},
+    {{"id": "p2", "nome": "Nome Inventado", "papel": "papel na mansão", "genero": "f"}},
+    {{"id": "p3", "nome": "Nome Inventado", "papel": "papel na mansão", "genero": "m"}}
+  ],
+  "culpado_id": "p1",
   "arma": "veneno|faca|corda",
   "local": "biblioteca|cozinha|jardim",
   "alibis": {{
-    "mordomo": "alibi curto",
-    "herdeira": "alibi curto",
-    "jardineiro": "alibi curto"
+    "p1": "alibi curto",
+    "p2": "alibi curto",
+    "p3": "alibi curto"
   }}
 }}"""),
     ("human", "Gere o mistério agora."),
@@ -132,13 +135,10 @@ Formato:
 
 
 def criar_historia(state: EstadoJogo) -> None:
-    """Chama o Agente 1 e popula o EstadoJogo com história + solução."""
     llm = get_llm()
     chain = _story_prompt | llm
     resposta = chain.invoke({})
-
     conteudo = resposta.content.strip()
-    # Remove blocos ```json``` que modelos menores às vezes incluem
     if conteudo.startswith("```"):
         conteudo = conteudo.split("```")[1]
         if conteudo.startswith("json"):
@@ -146,13 +146,17 @@ def criar_historia(state: EstadoJogo) -> None:
 
     data = json.loads(conteudo)
 
-    state.historia = data["historia"]
-    state.solucao  = {
-        "pessoa": data["pessoa"],
-        "arma":   data["arma"],
-        "local":  data["local"],
+    state.historia    = data["historia"]
+    state.personagens = data["personagens"]  # lista completa com nome/papel/gênero
+
+    culpado = state.get_personagem(data["culpado_id"])
+    state.solucao = {
+        "pessoa_id": data["culpado_id"],
+        "pessoa":    culpado["nome"],
+        "arma":      data["arma"],
+        "local":     data["local"],
     }
-    state.alibis = data.get("alibis", {})
+    state.alibis = data.get("alibis", {})  # chaveado por id (p1, p2, p3)
 
 
 # ==============================
@@ -187,16 +191,19 @@ Se for culpado escolha uma estratégia:
 ])
 
 
-def interrogar_suspeito(personagem: str, pergunta: str, state: EstadoJogo) -> str:
-    """Chama o Agente 2 e registra a resposta no histórico."""
+def interrogar_suspeito(pid: str, pergunta: str, state: EstadoJogo) -> str:
+    personagem = state.get_personagem(pid)
+    if not personagem:
+        raise ValueError(f"Personagem {pid} não encontrado")
+
     llm = get_llm()
     chain = _suspect_prompt | llm
 
-    e_culpado = "SIM" if personagem == state.solucao.get("pessoa") else "NÃO"
-    alibi     = state.alibis.get(personagem, "Sem álibi registrado.")
+    e_culpado = "SIM" if pid == state.solucao.get("pessoa_id") else "NÃO"
+    alibi     = state.alibis.get(pid, "Sem álibi registrado.")
 
     resposta = chain.invoke({
-        "personagem": personagem,
+        "personagem": f"{personagem['nome']} ({personagem['papel']})",
         "historia":   state.historia,
         "alibi":      alibi,
         "e_culpado":  e_culpado,
@@ -204,7 +211,12 @@ def interrogar_suspeito(personagem: str, pergunta: str, state: EstadoJogo) -> st
         "pergunta":   pergunta,
     })
 
-    state.registrar_interrogatorio(personagem, pergunta, resposta.content)
+    state.historico.append({
+        "pid": pid,
+        "nome": personagem["nome"],
+        "pergunta": pergunta,
+        "resposta": resposta.content,
+    })
     return resposta.content
 
 

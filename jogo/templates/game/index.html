@@ -1,112 +1,118 @@
 {% extends "game/base.html" %}
+{% load static %}
 {% block title %}Murdle — Início{% endblock %}
 
 {% block extra_css %}
 <style>
-  .start-wrap { text-align: center; padding: 3.5rem 0 2rem; }
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
-  .icon { font-size: 52px; display: block; margin-bottom: 1.5rem; }
+body {
+  font-family: 'Press Start 2P', monospace;
+  background: #0a0a18;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh;
+}
+.start-screen {
+  max-width: 480px; width: 100%;
+  padding: 1rem; text-align: center;
+}
+.title {
+  font-size: clamp(20px, 6vw, 32px);
+  color: #ffd060;
+  text-shadow: 3px 3px 0 #f0a000, 6px 6px 0 #5a3000;
+  animation: flash 2s infinite;
+  margin-bottom: 0.5rem;
+}
+@keyframes flash { 0%,100%{opacity:1} 50%{opacity:.8} }
+.subtitle { font-size: 7px; color: #888; letter-spacing: 3px; margin-bottom: 1rem; }
 
-  h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(2.4rem, 6vw, 3.6rem);
-    font-weight: 700; letter-spacing: -1px;
-    color: var(--parch);
-    margin-bottom: .5rem;
-  }
-  .tagline {
-    font-family: 'Playfair Display', serif;
-    font-style: italic; font-size: 16px;
-    color: var(--parch-dim); margin-bottom: 2.5rem;
-  }
+.dog-wrap {  position: relative; display: inline-block; }
+.dog-wrap img { display: block; image-rendering: pixelated; }
 
-  .rules {
-    display: grid; grid-template-columns: repeat(3,1fr);
-    gap: 12px; margin-bottom: 2rem; text-align: left;
-  }
-  .rule-num {
-    font-family: 'DM Mono', monospace;
-    font-size: 28px; color: var(--gold); font-weight: 500; margin-bottom: 6px;
-  }
-  .rule p { font-size: 13px; color: var(--fog); line-height: 1.7; }
+.rules-box {
+  border: 2px solid #f0a000;
+  padding: 16px; margin-bottom: 1.5rem;
+  text-align: left;
+}
+.rules-title { font-size: 15px; color: #f0a000; margin-bottom: 10px; letter-spacing: 1px; }
+.rule-line { font-size: 7px; color: #c8b98a; line-height: 2.5; }
+.rule-line::before { content: '▶ '; color: #f0a000; }
 
-  .divider {
-    border: none; border-top: 1px solid rgba(200,150,12,.2);
-    margin: 2rem 0;
-  }
+.form-box { border: 2px solid #333; padding: 14px; margin-bottom: 1rem; text-align: left; }
+.form-label { font-size: 5px; color: #ffd060; margin-bottom: 6px; display: block; letter-spacing: 1px; }
+.form-row { display: flex; gap: 6px; justify-content: center; align-items: center; }
+.form-row input {
+  flex: 1;
+  background: #1a1a30;
+  border: 2px solid #444;
+  color: #f0e8c8;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px; padding: 8px 10px; outline: none;
+}
+.form-row input:focus { border-color: #f0a000; }
+.rpg-btn {
+  
+  padding: 10px 14px;
+  background: #2a1a00;
+  border: 2px solid #f0a000;
+  color: #ffd060;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.8rem; cursor: pointer;
+  transition: all .1s; white-space: nowrap;
+}
+.rpg-btn:hover { background: #f0a000; color: #000; }
+.rpg-btn:disabled { opacity:.4; cursor:not-allowed; }
 
-  .form-row { display: flex; gap: 8px; align-items: center; }
-  .form-row input { flex: 1; }
+.notice { font-size: 5px; color: #555; line-height: 2.2; margin-top: .5rem; }
+.notice a { color: #f0a000; }
+.error-box { font-size: 5px; color: #f66; border: 1px solid #c00; padding: 8px 10px; margin-bottom: 1rem; }
 
-  .notice {
-    font-size: 12px; color: var(--fog);
-    margin-top: .6rem; text-align: left;
-  }
-  .notice span { color: var(--blood-lt); }
-
-  @media(max-width:520px){ .rules{ grid-template-columns:1fr; } }
+.press { font-size: 10px; color: #f0e8c8; animation: blink 1s step-end infinite; margin-top: .5rem; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="start-wrap">
+<div class="start-screen">
+  <div class="dog-wrap">
+    <img src="{% static 'img/detetive.png' %}" width="200" height="200" alt="Cachorro Detetive">
+    <div class="dog-shadow"></div>
+  </div>
 
-  <span class="icon">🔍</span>
-  <p class="eyebrow" style="margin-bottom:.6rem;">Um jogo de lógica e dedução</p>
-  <h1>Murdle</h1>
-  <p class="tagline">Mistério na Mansão</p>
+  <div class="title">Código de Silêncio</div>
+  <div class="subtitle">MISTÉRIO NA MANSÃO</div>
 
-  <div class="rules">
-    <div class="card rule">
-      <div class="rule-num">01</div>
-      <p>Interrogue os <strong>3 suspeitos</strong> e analise suas respostas em busca de contradições.</p>
-    </div>
-    <div class="card rule">
-      <div class="rule-num">02</div>
-      <p>Determine o <strong>culpado</strong>, a <strong>arma</strong> e o <strong>local</strong> do crime.</p>
-    </div>
-    <div class="card rule">
-      <div class="rule-num">03</div>
-      <p>Faça sua acusação em até <strong>5 tentativas</strong>. Dicas são fornecidas a cada erro.</p>
-    </div>
+  <div class="rules-box">
+    <div class="rules-title">★ COMO JOGAR ★</div>
+    <div class="rule-line">INTERROGUE OS 3 SUSPEITOS</div>
+    <div class="rule-line">DESCUBRA: CULPADO, ARMA E LOCAL</div>
+    <div class="rule-line">VOCÊ TEM 5 TENTATIVAS</div>
+    <div class="rule-line">DICAS APÓS CADA ERRO</div>
   </div>
 
   {% if erro %}
-  <div class="alert alert-error" style="text-align:left;">
-    ⚠ Erro ao gerar mistério: {{ erro }}
-  </div>
+  <div class="error-box">✗ ERRO: {{ erro }}</div>
   {% endif %}
 
-  <form method="post" action="{% url 'novo_jogo' %}">
+  <form method="post" action="{% url 'novo_jogo' %}" id="start-form">
     {% csrf_token %}
-    <div class="card" style="text-align:left; margin-bottom:.5rem;">
-      <p class="eyebrow" style="margin-bottom:.8rem;">🔑 Chave OpenAI API</p>
+    <div class="form-box">
+      
       <div class="form-row">
-        <input type="password" name="api_key" id="api_key"
-               placeholder="sk-..." autocomplete="off" required />
-        <button type="submit" class="btn btn-lg" id="start-btn">
-          Iniciar investigação →
-        </button>
+        <button type="submit" class="rpg-btn" id="start-btn">START ▶</button>
       </div>
     </div>
   </form>
-  <p class="notice">
-    <span>Nota:</span> Sua chave é usada apenas nesta sessão e não é armazenada.
-    Você precisará de uma chave válida da <a href="https://platform.openai.com" style="color:var(--gold);">OpenAI</a>.
-  </p>
-
+  <div class="press">PRESS START</div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  document.querySelector('form').addEventListener('submit', function(e) {
-    const btn = document.getElementById('start-btn');
-    btn.disabled = true;
-    btn.innerHTML = 'Gerando mistério <span class="dots"><span></span><span></span><span></span></span>';
-    // Salva a chave em sessionstorage para passar via hidden field depois
-    const key = document.getElementById('api_key').value;
-    sessionStorage.setItem('oai_key', key);
-  });
+document.getElementById('start-form').addEventListener('submit', function() {
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true;
+  btn.textContent = 'LOADING...';
+});
 </script>
 {% endblock %}
